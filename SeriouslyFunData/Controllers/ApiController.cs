@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Filters;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,21 @@ using System.Threading.Tasks;
 namespace SeriouslyFunData.Controllers
 {
     public record Seleucid(string name, int StartReign, int endReign, string[] consorts) { }
+
+    public class Teacher
+    {
+        public string Name { get; set; }
+        public string HomeState { get; set; }
+    }
+
+    public class AllowCrossSiteJsonAttribute : ActionFilterAttribute
+    {
+        public override void OnActionExecuting(ActionExecutingContext filterContext)
+        {
+            filterContext.HttpContext.Response.Headers.Add("Access-Control-Allow-Origin", "*");
+            base.OnActionExecuting(filterContext);
+        }
+    }
 
     public class ApiController : Controller
     {
@@ -69,12 +85,13 @@ namespace SeriouslyFunData.Controllers
             new Seleucid("Philip II Philoromaeus", 65, 63, new string[] { })
         };
 
-
+        [AllowCrossSiteJsonAttribute]
         public IActionResult GenerateARandomNumber()
         {
             return Content(new Random().Next(1000).ToString());
         }
 
+        [AllowCrossSiteJsonAttribute]
         public IActionResult ChuckNorrisFact()
         {
             return Json(new
@@ -83,6 +100,7 @@ namespace SeriouslyFunData.Controllers
             });
         }
 
+        [AllowCrossSiteJsonAttribute]
         public IActionResult Seleucids()
         {
             return Json(new
@@ -90,7 +108,127 @@ namespace SeriouslyFunData.Controllers
                 seleucids = _seleucids
             });
         }
+
+        public IActionResult ATeacher()
+        {
+            var teacher = new Teacher
+            {
+                Name = "Gregg",
+                HomeState = "Ohio"
+            };
+
+            using (var stringwriter = new System.IO.StringWriter())
+            {
+                var serializer = new System.Xml.Serialization.XmlSerializer(teacher.GetType());
+                serializer.Serialize(stringwriter, teacher);
+                return Content(stringwriter.ToString(), "text/xml");
+            }
+        }
+
+        public IActionResult YourTeachers()
+        {
+            var teachers = new List<Teacher>
+            {
+                new Teacher
+                {
+                    Name = "Gregg",
+                    HomeState = "Ohio"
+                },
+                new Teacher
+                {
+                    Name = "Eric",
+                    HomeState = "Texas"
+                }
+            };
+
+
+            using (var stringwriter = new System.IO.StringWriter())
+            {
+                var serializer = new System.Xml.Serialization.XmlSerializer(teachers.GetType());
+                serializer.Serialize(stringwriter, teachers);
+                return Content(stringwriter.ToString(), "text/xml");
+            }
+        }
+
+        public IActionResult SendMeFormOrQuery(MessageThing messageBody)
+        {
+            if (String.IsNullOrWhiteSpace(messageBody.Message))
+            {
+                messageBody.Message = "I'm sorry, I didn't quite get that.";
+            }
+
+            return Json(new
+            {
+                youSaid = messageBody.Message
+            });
+        }
+
+        [HttpPost]
+        public IActionResult SendMeJson([FromBody] MessageThing messageBody)
+        {
+            if (String.IsNullOrWhiteSpace(messageBody.Message))
+            {
+                messageBody.Message = "I'm sorry, I didn't quite get that.";
+            }
+
+            return Json(new
+            {
+                youSaid = messageBody.Message
+            });
+        }
+
+        [AllowCrossSiteJsonAttribute]
+        public IActionResult Parks()
+        {
+            System.Threading.Thread.Sleep(3000);
+            var json = System.IO.File.ReadAllText("parkdata.json");
+            return Content(json, "application/json");
+        }
+
+        [HttpPost]
+        public ActionResult TrackingNumber(Address address)
+        {
+            if (String.IsNullOrWhiteSpace(address.State)
+                || String.IsNullOrWhiteSpace(address.City)
+                || String.IsNullOrWhiteSpace(address.Country)
+                || String.IsNullOrWhiteSpace(address.Postal)
+                || String.IsNullOrWhiteSpace(address.Street)
+                )
+            {
+                return StatusCode(400);
+            }
+
+            var rng = new Random();
+
+            return Json(new
+            {
+                TrackingNumber = Guid.NewGuid().ToString().Replace("-", ""),
+                EstimatedArrivalDate = DateTime.Now.AddDays(rng.Next(2, 5)).ToShortDateString()
+            });
+        }
     }
 
+    public class Address
+    {
+        public string Street { get; set; }
+        public string City { get; set; }
+        public string State { get; set; }
+        public string Postal { get; set; }
+        public string Country { get; set; }
+    }
 
+    public class MessageThing
+    {
+        public string Message { get; set; }
+    }
+
+    public class Park
+    {
+        public string ParkId { get; set; }
+        public string ParkName { get; set; }
+        public string Borough { get; set; }
+        public int Acres { get; set; }
+        public string Description { get; set; }
+        public string HabitatType { get; set; }
+    }
 }
